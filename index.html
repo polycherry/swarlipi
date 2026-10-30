@@ -132,6 +132,26 @@ sup.kan{font-size:.62em;vertical-align:.7em;margin-right:.08em;display:inline-fl
 .restore{display:grid;gap:8px;background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:12px}
 .restore textarea{font-family:var(--f-mono);font-size:.8rem;min-height:110px;background:var(--field);border:1px solid var(--rule);border-radius:6px;padding:8px;width:100%}
 [hidden]{display:none!important}
+.work{display:grid;grid-template-columns:190px minmax(0,1fr);gap:16px;align-items:start}
+.nav{position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px);background:var(--sheet);border:1px solid var(--rule);border-radius:10px;padding:10px 8px;max-height:calc(100vh - 24px);overflow:auto}
+.nav h4{margin:2px 8px 6px;font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);font-weight:500}
+#navList{display:grid;gap:2px}
+.nav-item{display:flex;align-items:center;gap:4px;border-radius:6px;background:var(--sheet)}
+.nav-item:hover,.nav-item.active{background:var(--paper)}
+.nav-item.active .nm{color:var(--accent)}
+.nav-item .grip{cursor:grab;color:var(--ink-2);touch-action:none;user-select:none;padding:6px 3px 6px 6px;border-radius:4px;font-size:1rem;line-height:1}
+.nav-item .nm{flex:1;min-width:0;border:0;background:none;text-align:left;padding:6px 6px 6px 2px;font-family:var(--f-note);font-size:1rem;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-item .tag{font-size:.66rem;color:var(--ink-2);padding-right:6px;white-space:nowrap}
+.nav-item.dragging{background:var(--accent-soft);box-shadow:0 3px 10px rgba(0,0,0,.14);position:relative;z-index:1}
+.nav-hint{margin:8px 8px 2px;font-size:.72rem;color:var(--ink-2)}
+body.reading .nav .grip,body.reading .nav-hint{display:none}
+body.reading .nav-item .nm{padding-left:8px}
+@media (max-width:860px){.work{grid-template-columns:minmax(0,1fr)}.nav{position:static;max-height:none}}
+.free{display:grid;gap:.7em;font-family:var(--f-note);font-size:calc(var(--nt,1) * 1.32rem);padding:4px 2px}
+.fline{display:grid;gap:.1em}
+.fline.gap{height:.4em}
+.fl-sw{display:flex;flex-wrap:wrap;gap:.3em .75em;align-items:baseline;padding:.35em 0 .7em;line-height:1.3}
+.fl-ly{color:var(--bol);white-space:pre-wrap;line-height:1.45}
 .sheet>*,.sec>*{min-width:0}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--sheet);padding:7px 14px;border-radius:6px;font-size:.88rem;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
@@ -207,6 +227,8 @@ body.reading .ed,body.reading .sec-title .ctl,body.reading .add,body.reading .se
     </div>
   </details>
 
+  <div class="work">
+  <aside class="nav" id="nav" aria-label="Sections"><h4>Sections</h4><div id="navList"></div><p class="nav-hint">Drag ⠇ to reorder</p></aside>
   <article class="sheet" id="sheet">
     <div class="head" id="head"></div>
     <div id="secs" style="display:grid;gap:30px;min-width:0"></div>
@@ -217,8 +239,13 @@ body.reading .ed,body.reading .sec-title .ctl,body.reading .add,body.reading .se
       <button class="btn" data-add="Taan">Taan</button>
       <button class="btn" data-add="Tihai">Tihai</button>
       <button class="btn" data-add="Section">Other</button>
+      <span style="margin-left:10px">No taal</span>
+      <button class="btn" data-add="Chalan" data-free="1">Chalan</button>
+      <button class="btn" data-add="Vistaar" data-free="1">Vistaar</button>
+      <button class="btn" data-add="Lyrics" data-free="1">Lyrics</button>
     </div>
   </article>
+  </div>
 
   <div class="foot">
     <button class="btn pri" id="pdfBtn" hidden>Export PDF</button>
@@ -365,6 +392,7 @@ function noteHTML(n,sc){
 function itemHTML(it,sc){
   if(it.k==='n')return noteHTML(it,sc);
   if(it.k==='d')return '<span class="dash">–</span>';
+  if(it.t===','||it.t==='/')return `<span class="dash">${it.t}</span>`;
   return `<span class="lit">${esc(it.t)}</span>`;
 }
 function beatHTML(tok,sc){
@@ -436,7 +464,14 @@ function renderHead(){
   document.getElementById('head').innerHTML=h;fitGrids(document.getElementById('head'));
 }
 
+function freeHTML(s){
+  const sl=(s.swar||'').split('\n'),ll=(s.bol||'').split('\n'),n=Math.max(sl.length,ll.length);
+  let h='';for(let i=0;i<n;i++){const a=(sl[i]||'').trim(),b=(ll[i]||'').trim();if(!a&&!b){h+='<div class="fline gap"></div>';continue}
+    h+=`<div class="fline">${a?`<div class="fl-sw">${tokens(a).map(t=>`<span class="c">${beatHTML(t,doc.scale)}</span>`).join('')}</div>`:''}${b?`<div class="fl-ly">${esc(L()==='dev'?b.replace(/(^|\s)-(?=\s|$)/g,'$1ऽ'):b)}</div>`:''}</div>`}
+  return (s.swar||s.bol)?`<div class="free">${h}</div>`:'<div class="empty">Type swaras or lyrics above, one phrase per line.</div>';
+}
 function countText(s){
+  if(s.free){const n=(s.swar||'').split('\n').filter(x=>x.trim()).length;return n?`${n} line${n>1?'s':''} of swaras · no taal`:'No taal: write freely, one phrase per line'}
   const B=TAALS[doc.taal].beats;const n=tokens(s.swar).length,b=tokens(s.bol).length;
   if(!n&&!b)return '';
   const end=(s.start-1)+n;const full=Math.floor(end/B),rem=end%B;
@@ -446,9 +481,10 @@ function countText(s){
 }
 function renderSecGrid(s){
   const el=document.getElementById('g-'+s.id);if(!el)return;
-  el.innerHTML=gridHTML(tokens(s.swar),tokens(s.bol),s.start,TAALS[doc.taal],doc.scale,{w:docColW(s)});fitGrids(el);
+  if(s.free)el.innerHTML=freeHTML(s);
+  else{el.innerHTML=gridHTML(tokens(s.swar),tokens(s.bol),s.start,TAALS[doc.taal],doc.scale,{w:docColW(s)});fitGrids(el)}
   document.getElementById('c-'+s.id).innerHTML=countText(s);
-  document.getElementById('t-'+s.id).innerHTML=secTitle(s.title||'');
+  document.getElementById('t-'+s.id).innerHTML=secTitle(s.title||'');renderNav();
 }
 function buildSections(){
   const wrap=document.getElementById('secs');const B=TAALS[doc.taal].beats;
@@ -463,10 +499,10 @@ function buildSections(){
     <div class="ed">
       <div class="ed-row">
         <label class="f">Section name<input id="sn-${s.id}" data-k="title" value="${esc(s.title)}"></label>
-        <label class="f">Starts on matra<input id="ss-${s.id}" data-k="start" type="number" min="1" max="${B}" value="${s.start}"></label>
+        ${s.free?'':`<label class="f">Starts on matra<input id="ss-${s.id}" data-k="start" type="number" min="1" max="${B}" value="${s.start}"></label>`}
       </div>
-      <label class="f wide">Swara<textarea id="sw-${s.id}" data-k="swar" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="S R G M | P - - - | SRGM PDNS' ...">${esc(s.swar)}</textarea></label>
-      <label class="f wide">Bols / lyrics<textarea id="sb-${s.id}" data-k="bol" class="bol" spellcheck="false" placeholder="one syllable per matra, e.g. भो ऽ र भ ई">${esc(s.bol)}</textarea></label>
+      <label class="f wide">Swara${s.free?' (no taal)':''}<textarea id="sw-${s.id}" data-k="swar" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="${s.free?"One phrase per line, e.g. .N S R G , R G - S":"S R G M | P - - - | SRGM PDNS' ..."}">${esc(s.swar)}</textarea></label>
+      <label class="f wide">Bols / lyrics<textarea id="sb-${s.id}" data-k="bol" class="bol" spellcheck="false" placeholder="${s.free?'Write lyrics freely. Line 1 sits under swara line 1, and so on.':'one syllable per matra, e.g. भो ऽ र भ ई'}">${esc(s.bol)}</textarea></label>
       <div class="count" id="c-${s.id}"></div>
     </div>
     <div id="g-${s.id}"></div>
@@ -531,7 +567,7 @@ $('secs').addEventListener('click',e=>{
 });
 $('addBar').addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(!b)return;let t=b.dataset.add;
   if(t==='Taan'||t==='Tihai'){const n=doc.sections.filter(s=>s.title.startsWith(t)).length+1;t=t+' '+n}
-  const s={id:uid(),title:t,start:t==='Antara'?(doc.sections.find(x=>x.title==='Sthayi')||{start:1}).start:1,swar:'',bol:''};
+  const s={id:uid(),title:t,free:!!b.dataset.free,start:t==='Antara'?(doc.sections.find(x=>x.title==='Sthayi')||{start:1}).start:1,swar:'',bol:''};
   doc.sections.push(s);buildSections();save();const ta=$('sw-'+s.id);ta&&ta.focus();
 });
 
@@ -555,6 +591,7 @@ function plainText(){
   if(i.aroha)lines.push('Aroha:   '+i.aroha);if(i.avaroha)lines.push('Avaroha: '+i.avaroha);
   const k=['R','G','D','N'].filter(s=>doc.scale[s]==='k');lines.push(`Defaults: ${k.length?k.join(' ')+' komal':'no komal'}${doc.scale.M==='t'?', M tivra':''}`);
   doc.sections.forEach(s=>{
+    if(s.free){lines.push('',`[${s.title}]`);const sl=(s.swar||'').split('\n'),ll=(s.bol||'').split('\n');for(let i=0;i<Math.max(sl.length,ll.length);i++){if(sl[i]&&sl[i].trim())lines.push(sl[i].trim());if(ll[i]&&ll[i].trim())lines.push(ll[i].trim())}return}
     lines.push('',`[${s.title}]`);const sw=tokens(s.swar),bo=tokens(s.bol),off=s.start-1;const tot=Math.max(sw.length,bo.length);const rows=Math.ceil((off+tot)/B)||0;
     for(let r=0;r<rows;r++){const a=[],b=[];for(let c=0;c<B;c++){const idx=r*B+c-off;let x=idx>=0&&sw[idx]?sw[idx]:'',y=idx>=0&&bo[idx]?bo[idx]:'';const w=Math.max(x.length,[...y].length,1);
       const pre=vs.has(c)&&c?'| ':'';a.push(pre+x.padEnd(w));b.push(pre+y.padEnd(w))}
@@ -585,6 +622,33 @@ $('fDev').innerHTML=FONTS_DEV.map(([f,k])=>`<option value="${f}">${f} · ${k}</o
 $('fEng').addEventListener('change',e=>{store.fontEng=e.target.value;applyFonts();save()});
 $('fDev').addEventListener('change',e=>{store.fontDev=e.target.value;applyFonts();save()});
 
+// section sidebar: jump to a section; drag the grip (or focus it and use arrow keys) to reorder
+function renderNav(){
+  const list=$('navList');if(!list||navDrag)return;
+  list.innerHTML=doc.sections.length?doc.sections.map(s=>`<div class="nav-item" data-id="${s.id}"><span class="grip" tabindex="0" role="button" aria-label="Reorder ${esc(s.title||'section')} (arrow keys)">⠇</span><button class="nm" type="button">${secTitle(s.title||'Untitled')}</button>${s.free?'<span class="tag">no taal</span>':''}</div>`).join(''):'<div class="hint" style="padding:4px 8px">No sections yet</div>';
+  updateActive();
+}
+let navDrag=null;
+function commitOrder(focusId){const order=[...$('navList').querySelectorAll('.nav-item')].map(x=>x.dataset.id);doc.sections.sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));navDrag=null;buildSections();save();if(focusId){const g=$('navList').querySelector(`[data-id="${focusId}"] .grip`);g&&g.focus()}}
+$('nav').addEventListener('click',e=>{const b=e.target.closest('.nm');if(!b)return;const id=b.closest('.nav-item').dataset.id;const sec=document.querySelector(`.sec[data-id="${id}"]`);
+  sec&&sec.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'})});
+$('nav').addEventListener('pointerdown',e=>{const g=e.target.closest('.grip');if(!g||document.body.classList.contains('reading'))return;e.preventDefault();
+  try{g.setPointerCapture(e.pointerId)}catch(_){}navDrag={item:g.closest('.nav-item')};navDrag.item.classList.add('dragging');g.style.cursor='grabbing'});
+$('nav').addEventListener('pointermove',e=>{if(!navDrag)return;const list=$('navList');
+  const others=[...list.querySelectorAll('.nav-item')].filter(x=>x!==navDrag.item);let before=null;
+  for(const it of others){const r=it.getBoundingClientRect();if(e.clientY<r.top+r.height/2){before=it;break}}
+  if(before){if(navDrag.item.nextElementSibling!==before)list.insertBefore(navDrag.item,before)}else if(list.lastElementChild!==navDrag.item)list.appendChild(navDrag.item)});
+const endDrag=()=>{if(!navDrag)return;navDrag.item.classList.remove('dragging');commitOrder()};
+$('nav').addEventListener('pointerup',endDrag);$('nav').addEventListener('pointercancel',endDrag);
+$('nav').addEventListener('keydown',e=>{const g=e.target.closest('.grip');if(!g||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;e.preventDefault();
+  const it=g.closest('.nav-item'),list=$('navList');
+  if(e.key==='ArrowUp'&&it.previousElementSibling)list.insertBefore(it,it.previousElementSibling);
+  else if(e.key==='ArrowDown'&&it.nextElementSibling)list.insertBefore(it.nextElementSibling,it);else return;
+  commitOrder(it.dataset.id)});
+function updateActive(){const secs=[...document.querySelectorAll('.sec')];let cur=secs[0];for(const s of secs){if(s.getBoundingClientRect().top<140)cur=s}
+  document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',!!cur&&x.dataset.id===cur.dataset.id))}
+let actT=0;window.addEventListener('scroll',()=>{if(actT)return;actT=requestAnimationFrame(()=>{actT=0;updateActive()})},{passive:true});
+
 // notation size
 function applySize(){const s=store.ntScale||'1';$('fSize').value=s;document.documentElement.style.setProperty('--nt',s);renderHead();doc.sections.forEach(renderSecGrid)}
 $('fSize').addEventListener('change',e=>{store.ntScale=e.target.value;applySize();save()});
@@ -603,7 +667,7 @@ $('pdfBtn').onclick=async e=>{
     root.setAttribute('data-theme','light');document.body.classList.add('reading');sheet.style.width='1000px';sheet.style.borderColor='transparent';
     fitGrids(document);if(document.fonts)await document.fonts.ready;await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
     const top=sheet.getBoundingClientRect().top;
-    const breaks=[...sheet.querySelectorAll('.sec, tr.sr:not(:first-child), .theka')].map(el=>el.getBoundingClientRect().top-top-6).filter(y=>y>0);
+    const breaks=[...sheet.querySelectorAll('.sec, tr.sr:not(:first-child), .theka, .fline')].map(el=>el.getBoundingClientRect().top-top-6).filter(y=>y>0);
     const scale=2;
     const canvas=await html2canvas(sheet,{scale,backgroundColor:'#ffffff',useCORS:true,logging:false});
     const {jsPDF}=window.jspdf;const pdf=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
